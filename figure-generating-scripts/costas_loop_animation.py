@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from scipy import signal
-import imageio
+import imageio.v2 as imageio
 
 num_symbols = 2501
 sps = 8
@@ -43,13 +43,11 @@ Ts = 1/fs # calc sample period
 t = np.arange(0, Ts*len(samples), Ts) # create time vector
 samples = samples * np.exp(1j*2*np.pi*fo*t) # perform freq shift
 
-
-
 # Muller muller
 samples_interpolated = signal.resample_poly(samples, 16, 1)
 mu = 0 # initial estimate of phase of sample
-out = np.zeros(len(samples) + 10, dtype=np.complex)
-out_rail = np.zeros(len(samples) + 10, dtype=np.complex) # stores values, each iteration we need the previous 2 values plus current value
+out = np.zeros(len(samples) + 10, dtype=np.complex128)
+out_rail = np.zeros(len(samples) + 10, dtype=np.complex128) # stores values, each iteration we need the previous 2 values plus current value
 i_in = 0 # input samples index
 i_out = 2 # output index (let first two outputs be 0)
 while i_out < len(samples) and i_in < len(samples):
@@ -72,8 +70,8 @@ phase = 0
 freq = 0
 # These next two params is what to adjust, to make the feedback loop faster or slower (which impacts stability)
 alpha = 0.005
-beta = 0.001
-out = np.zeros(N, dtype=np.complex)
+beta = 0.0001 #0.001
+out = np.zeros(N, dtype=np.complex128)
 freq_log = []
 ii = 0
 iii = 0
@@ -81,6 +79,8 @@ filenames = []
 for i in range(N):
     out[i] = samples[i] * np.exp(-1j*phase) # adjust the input sample by the inverse of the estimated phase offset
     error = np.real(out[i]) * np.imag(out[i]) # This is the error formula for 2nd order Costas Loop (e.g. for BPSK)
+    error_xnor = ~((np.real(out[i]) > 0) ^ (np.imag(out[i]) > 0)) * 2 - 1
+    error = error_xnor
 
     # Advance the loop (recalc phase and freq offset)
     freq += (beta * error)
@@ -122,12 +122,17 @@ plt.plot(np.real(out), '.-')
 plt.plot(np.imag(out), '.-')
 plt.show()
 '''
+#%%
+import imageio.v2 as imageio
+
+#filenames = ['/tmp/costas_' + str(iii) + '.png' for iii in range(1005)]
 
 # Create animated gif
 images = []
-for filename in filenames:
-    images.append(imageio.imread(filename))
-imageio.mimsave('/tmp/costas.gif', images, fps=20)
+for i, filename in enumerate(filenames):
+    images.append(imageio.imread(filename)[:602,:868,])
+    print(f"{i} {images[i].shape}")
+imageio.mimsave('/tmp/costas_no_mm_xnor_b0001.gif', images, fps=20)
 
 
 
